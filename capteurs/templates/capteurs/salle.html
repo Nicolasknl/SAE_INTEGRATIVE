@@ -1,0 +1,165 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détails Salle {{ salle_id }}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lexend:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <link rel="stylesheet" href="{% static 'capteurs/css/style.css' %}">
+</head>
+<body>
+
+    <div class="container dashboard-container py-4">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-sm px-3 rounded-pill text-white">
+                <i class="fa-solid fa-arrow-left me-2"></i> Retour au Dashboard
+            </a>
+            <div class="text-end">
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-secondary text-nowrap"><i class="fa-solid fa-sync fa-spin text-warning me-1"></i> Auto-refresh :</small>
+                    <select class="form-select form-select-sm py-0" style="width: auto; height: 28px;">
+                        <option value="5">5s</option>
+                        <option value="10">10s</option>
+                        <option value="30">30s</option>
+                        <option value="0">Désactivé</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <h1 class="fw-bold text-white mb-1">
+                <i class="fa-solid fa-door-open me-2 {% if salle_id == 1 %}text-info{% else %}text-success{% endif %}"></i>
+                Données de la Salle {{ salle_id }}
+            </h1>
+            <p class="text-secondary">Visualisation, filtrage et édition des capteurs associés à cette pièce.</p>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="p-3 stat-box d-flex align-items-center justify-content-between" style="border-left-color: {% if salle_id == 1 %}var(--salle1-color){% else %}var(--salle2-color){% endif %};">
+                    <div>
+                        <small class="text-secondary text-uppercase tracking-wider">Moyenne Globale (Filtrée)</small>
+                        <h3 class="fw-bold mb-0 text-white mt-1">{{ moyenne_salle|default:"21.8" }} °C</h3>
+                    </div>
+                    <i class="fa-solid fa-thermometer-half fa-2x {% if salle_id == 1 %}text-info{% else %}text-success{% endif %}"></i>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4 d-flex align-items-center">
+                    <a href="{% url 'export_salle_csv' salle_id=salle_id %}" class="btn btn-outline-success w-100 py-3 rounded-3 fw-bold">
+                        <i class="fa-solid fa-file-csv me-2"></i> Exporter les données (.CSV)
+                     </a>
+            </div>
+        </div>
+
+<div class="card filter-card p-4 mb-4 shadow-sm">
+    <h5 class="text-white mb-3 fw-bold"><i class="fa-solid fa-filter text-warning me-2"></i> Filtres cumulables</h5>
+    <form method="GET" class="row g-3 align-items-end">
+
+        <div class="col-md-3">
+            <label class="form-label text-secondary small fw-bold">Nom ou ID du Capteur</label>
+            <input type="text" name="search" class="form-control" placeholder="Ex: 12345" value="{{ request.GET.search }}">
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label text-secondary small fw-bold">Depuis le</label>
+            <input type="datetime-local" name="date_debut" class="form-control" value="{{ request.GET.date_debut }}" onclick="this.showPicker()">
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label text-secondary small fw-bold">Jusqu'au</label>
+            <input type="datetime-local" name="date_fin" class="form-control" value="{{ request.GET.date_fin }}" onclick="this.showPicker()">
+        </div>
+
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100 fw-bold">Filtrer</button>
+            <a href="{% url 'salle_detail' salle_id=salle_id %}" class="btn btn-secondary" title="Réinitialiser">
+                <i class="fa-solid fa-rotate"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+        <div class="history-card p-4 mb-4 text-center text-secondary border border-secondary border-opacity-10">
+            <h6 class="text-start text-white mb-3"><i class="fa-solid fa-chart-line text-info me-2"></i> Aperçu Graphique Spécifique</h6>
+            <div class="py-4 bg-dark bg-opacity-20 rounded border border-dashed border-secondary border-opacity-25">
+                <i class="fa-solid fa-chart-area fa-3x mb-2 text-muted"></i>
+                <p class="mb-0 small text-muted">L'affichage dynamique des courbes s'injectera ici.</p>
+            </div>
+        </div>
+
+        <div class="history-card shadow-lg">
+            <div class="p-4 border-bottom border-secondary border-opacity-25">
+                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-database text-info me-2"></i> Données brutes de la pièce</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID Capteur</th>
+                            <th>Nom du Capteur</th>
+                            <th>Valeur Enregistrée</th>
+                            <th>Date / Heure de Réception</th>
+                            <th class="text-center">Configuration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mesure in mesures %}
+                        <tr>
+                            <td><code class="text-info">#{{ mesure.id }}</code></td>
+                            <td>{{ mesure.nom }}</td>
+                            <td class="fw-bold fs-5 text-white">{{ mesure.valeur }} °C</td>
+                            <td class="text-secondary">{{ mesure.date }}</td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="#" class="btn btn-outline-warning"><i class="fa-solid fa-pen"></i></a>
+                                    <a href="#" class="btn btn-outline-danger"><i class="fa-solid fa-trash"></i></a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        {% if salle_id == 1 %}
+                        <tr>
+                            <td><code class="text-info">#12345</code></td>
+                            <td>Capteur1 <span class="badge bg-secondary bg-opacity-25 text-secondary ms-1">Défaut</span></td>
+                            <td class="fw-bold fs-5 text-white">24.5 °C</td>
+                            <td class="text-secondary">15/06/2026 15:32:01</td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-warning"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td><code class="text-info">#89F2C1</code></td>
+                            <td>Capteur_Cuisine_Principal</td>
+                            <td class="fw-bold fs-5 text-white">19.2 °C</td>
+                            <td class="text-secondary">15/06/2026 15:31:56</td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-warning"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

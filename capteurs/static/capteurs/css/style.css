@@ -1,0 +1,168 @@
+/* --- Variables et Thème Sombre --- */
+:root {
+    --bg-dark: #0f172a;
+    --card-bg: #1e293b;
+    --salle1-color: #00d2ff;
+    --salle2-color: #00bf72;
+    --text-main: #f8fafc;
+}
+
+body {
+    background-color: var(--bg-dark);
+    font-family: 'Inter', sans-serif;
+    color: var(--text-main);
+}
+
+h1, h2, h3, h5, h6, .gauge-value {
+    font-family: 'Lexend', sans-serif;
+}
+
+.dashboard-container {
+    max-width: 1100px;
+    margin: 50px auto;
+}
+
+/* --- Style des Jauges (Index) --- */
+.gauge-card {
+    background: var(--card-bg);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    padding: 30px;
+}
+
+.gauge-card:hover {
+    transform: translateY(-10px);
+    background: #27354d;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+.gauge-outer {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: conic-gradient(var(--accent-color) calc(var(--percentage) * 1%), #334155 0);
+}
+
+.gauge-inner {
+    position: absolute;
+    width: 160px;
+    height: 160px;
+    background: var(--card-bg);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
+}
+
+.gauge-card:hover .gauge-inner {
+    background: #27354d;
+}
+
+.gauge-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.gauge-unit {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* --- Cartes de Filtrage et Graphiques (Salle) --- */
+.filter-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.form-control, .form-select {
+    background-color: #0f172a !important;
+    border: 1px solid #334155 !important;
+    color: #f8fafc !important;
+}
+
+.form-control::placeholder {
+    color: #64748b;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--salle1-color) !important;
+    box-shadow: 0 0 0 0.25rem rgba(0, 210, 255, 0.25);
+}
+
+.stat-box {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 4px solid var(--salle1-color);
+    border-radius: 8px;
+}
+
+/* --- Tableaux et Historique --- */
+.history-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+
+.table {
+    color: var(--text-main);
+    margin-bottom: 0;
+}
+
+.table thead {
+    background: rgba(0,0,0,0.2);
+}
+
+.table th {
+    border: none;
+    color: #94a3b8;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    padding: 15px 20px;
+}
+
+.table td {
+    border-color: rgba(255,255,255,0.05);
+    padding: 15px 20px;
+    vertical-align: middle;
+}
+
+/* --- Éléments UI (Statuts & Badges) --- */
+.status-dot {
+    height: 8px;
+    width: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    background-color: #ef4444;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+.badge-salle {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
