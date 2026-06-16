@@ -101,6 +101,7 @@ def salle_detail(request, salle_nom):
         'graph_dates': graph_dates,
         'graph_temps': graph_temps,
     }
+    
     return render(request, 'capteurs/salle.html', context)
 
 
