@@ -1,102 +1,166 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
 import csv
 from django.http import HttpResponse
+from django.db.models import Q, Avg
+from .models import Capteurs, Donnees
+from django.utils import timezone
+from datetime import timedelta
 
 
 def index(request):
-    # Logique pour la page d'accueil (Calcul des moyennes des deux salles, etc.)
+    stats_salles = Donnees.objects.values('id_capteur__emplacement').annotate(
+        moyenne_temp=Avg('temperature')
+    ).order_by('id_capteur__emplacement')
+
+    salles_data = []
+    for s in stats_salles:
+        nom_piece = s['id_capteur__emplacement']
+        if nom_piece:
+            salles_data.append({
+                'nom': nom_piece,
+                'moyenne': round(s['moyenne_temp'], 1) if s['moyenne_temp'] is not None else "--.-"
+            })
+
+    # 2. Récupération des 5 derniers relevés globaux de la BDD
+    derniers_releves = Donnees.objects.select_related('id_capteur').order_by('-timestamp')[:5]
+
+    derniers_messages = []
+    for r in derniers_releves:
+        derniers_messages.append({
+            'heure': r.timestamp.strftime('%H:%M:%S') if r.timestamp else '--:--:--',
+            'id': r.id_capteur.id_capteur,
+            'salle': r.id_capteur.emplacement if r.id_capteur.emplacement else "Sans salle",
+            'temp': r.temperature
+        })
+
+    # 3. Envoi au template index.html
     context = {
-        'moyenne_salle1': "24.2",
-        'moyenne_salle2': "19.5",
+        'salles': salles_data,
+        'derniers_messages': derniers_messages
     }
     return render(request, 'capteurs/index.html', context)
 
 
-def salle_detail(request, salle_id):
-    # 1. Récupération des filtres saisis par l'utilisateur dans l'URL
+def salle_detail(request, salle_nom):
+    # 1. Récupération des filtres de l'URL
     search_query = request.GET.get('search', '').strip()
-    date_debut = request.GET.get('date_debut', '')  # Format reçu : YYYY-MM-DDTHH:MM
-    date_fin = request.GET.get('date_fin', '')      # Format reçu : YYYY-MM-DDTHH:MM
+    date_debut = request.GET.get('date_debut', '')
+    date_fin = request.GET.get('date_fin', '')
 
-    # 2. Notre "Fausse" Base de données MySQL (Plus riche pour pouvoir tester les filtres)
-    # On utilise 'date_iso' au format YYYY-MM-DDTHH:MM pour trier et filtrer super facilement en Python
-    if salle_id == 1:
-        toutes_les_mesures = [
-            {'id': '12345', 'nom': 'Capteur1', 'valeur': 24.5, 'date_iso': '2026-06-15T15:32', 'date': '15/06/2026 15:32'},
-            {'id': '12A6B8', 'nom': 'Capteur_Salon_Fenetre', 'valeur': 23.9, 'date_iso': '2026-06-15T15:31', 'date': '15/06/2026 15:31'},
-            {'id': '12345', 'nom': 'Capteur1', 'valeur': 21.0, 'date_iso': '2026-06-14T10:00', 'date': '14/06/2026 10:00'},
-            {'id': '12A6B8', 'nom': 'Capteur_Salon_Fenetre', 'valeur': 20.5, 'date_iso': '2026-06-13T09:15', 'date': '13/06/2026 09:15'},
-        ]
-    else:
-        toutes_les_mesures = [
-            {'id': '89F2C1', 'nom': 'Capteur_Cuisine_Principal', 'valeur': 19.2, 'date_iso': '2026-06-15T15:31', 'date': '15/06/2026 15:31'},
-            {'id': '89F2C1', 'nom': 'Capteur_Cuisine_Principal', 'valeur': 18.5, 'date_iso': '2026-06-14T22:45', 'date': '14/06/2026 22:45'},
-            {'id': '89F2C1', 'nom': 'Capteur_Cuisine_Principal', 'valeur': 17.9, 'date_iso': '2026-06-12T11:30', 'date': '12/06/2026 11:30'},
-        ]
+    # 2. Requête de base pour la salle courante
+    mesures_queryset = Donnees.objects.filter(id_capteur__emplacement=salle_nom).select_related('id_capteur').order_by(
+        '-timestamp')
 
-    # 3. APPLICATION DES FILTRES (Logique cumulable)
-    mesures_filtrees = toutes_les_mesures
-
-    # Filtre de recherche (ID ou Nom du capteur)
+    # 3. Filtres ORM cumulables
     if search_query:
-        mesures_filtrees = [
-            m for m in mesures_filtrees
-            if search_query.lower() in m['id'].lower() or search_query.lower() in m['nom'].lower()
-        ]
+        mesures_queryset = mesures_queryset.filter(
+            Q(id_capteur__id_capteur__icontains=search_query) |
+            Q(id_capteur__nom__icontains=search_query)
+        )
 
-    # Filtre Date Début (On compare les chaînes ISO qui ont le même format)
     if date_debut:
-        mesures_filtrees = [m for m in mesures_filtrees if m['date_iso'] >= date_debut]
+        mesures_queryset = mesures_queryset.filter(timestamp__gte=date_debut)
 
-    # Filtre Date Fin
     if date_fin:
-        mesures_filtrees = [m for m in mesures_filtrees if m['date_iso'] <= date_fin]
+        mesures_queryset = mesures_queryset.filter(timestamp__lte=date_fin)
 
-    # 4. CALCUL DE LA MOYENNE DYNAMIQUE
-    # Elle s'adapte automatiquement en fonction des lignes restantes après filtrage !
-    if mesures_filtrees:
-        total_temp = sum(m['valeur'] for m in mesures_filtrees)
-        moyenne_calculee = round(total_temp / len(mesures_filtrees), 1)
+    # 4. Calcul de la moyenne dynamique sur les données filtrées
+    moyenne_recuperee = mesures_queryset.aggregate(Avg('temperature'))['temperature__avg']
+    moyenne_calculee = round(moyenne_recuperee, 1) if moyenne_recuperee is not None else "--.-"
+
+    # 5. PRÉPARATION DES DONNÉES DU GRAPHIQUE (Limité aux 3 dernières heures par défaut)
+    if not date_debut and not date_fin:
+        # Si aucun filtre de date n'est mis, on prend NOW - 3 heures
+        il_y_a_3_heures = timezone.now() - timedelta(hours=2)
+        mesures_chrono = mesures_queryset.filter(timestamp__gte=il_y_a_3_heures).order_by('timestamp')
     else:
-        moyenne_calculee = "--.-"
+        # Si l'utilisateur a mis un filtre, le graphique s'adapte à sa demande
+        mesures_chrono = mesures_queryset.order_by('timestamp')
+
+    # ASTUCE : On affiche juste '%H:%M' au lieu de la date complète pour alléger l'axe X
+    graph_dates = [m.timestamp.strftime('%H:%M') for m in mesures_chrono]
+    graph_temps = [float(m.temperature) for m in mesures_chrono]
+
+    # 6. Adaptation du format pour le tableau HTML
+    mesures_filtrees = []
+    for m in mesures_queryset:
+        mesures_filtrees.append({
+            'id_brut': m.id_donnee,  # Clé primaire nécessaire pour la suppression
+            'id': m.id_capteur.id_capteur,
+            'nom': m.id_capteur.nom,
+            'valeur': m.temperature,
+            'date_iso': m.timestamp.strftime('%Y-%m-%dT%H:%M') if m.timestamp else '',
+            'date': m.timestamp.strftime('%d/%m/%Y %H:%M') if m.timestamp else ''
+        })
 
     context = {
-        'salle_id': salle_id,
+        'salle_nom': salle_nom,
         'mesures': mesures_filtrees,
         'moyenne_salle': moyenne_calculee,
+        'graph_dates': graph_dates,
+        'graph_temps': graph_temps,
     }
     return render(request, 'capteurs/salle.html', context)
 
 
-def export_salle_csv(request, salle_id):
-    # 1. On récupère les filtres (pour pouvoir exporter uniquement ce qui est filtré à l'écran)
-    search_query = request.GET.get('search', '')
+def export_salle_csv(request, salle_nom):
+    # 1. Récupération des filtres pour l'export
+    search_query = request.GET.get('search', '').strip()
     date_debut = request.GET.get('date_debut', '')
     date_fin = request.GET.get('date_fin', '')
 
+    mesures_queryset = Donnees.objects.filter(id_capteur__emplacement=salle_nom).select_related('id_capteur').order_by(
+        '-timestamp')
+
+    if search_query:
+        mesures_queryset = mesures_queryset.filter(
+            Q(id_capteur__id_capteur__icontains=search_query) |
+            Q(id_capteur__nom__icontains=search_query)
+        )
+    if date_debut:
+        mesures_queryset = mesures_queryset.filter(timestamp__gte=date_debut)
+    if date_fin:
+        mesures_queryset = mesures_queryset.filter(timestamp__lte=date_fin)
+
+    # 2. Préparation du fichier CSV
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="export_salle_{salle_id}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="export_{salle_nom}.csv"'
 
-    # On utilise le writer CSV (avec encodage utf-8-sig pour que Excel lise bien les accents)
     writer = csv.writer(response, delimiter=';')
-
-    # Écriture de la ligne d'entête du tableau
     writer.writerow(['ID Capteur', 'Nom du Capteur', 'Valeur Enregistree (C)', 'Date et Heure'])
 
-    # 3. DONNÉES FICTIVES (À remplacer par ta requête MySQL plus tard)
-    # On simule ce que la BDD renverrait selon la salle
-    if salle_id == 1:
-        mesures_simulees = [
-            ['12345', 'Capteur1', '24.5', '15/06/2026 15:32:01'],
-            ['12A6B8', 'Capteur_Salon_Fenetre', '23.9', '15/06/2026 15:31:41']
-        ]
-    else:
-        mesures_simulees = [
-            ['89F2C1', 'Capteur_Cuisine_Principal', '19.2', '15/06/2026 15:31:56']
-        ]
-
-    # 4. Écriture des données dans le fichier
-    for ligne in mesures_simulees:
-        writer.writerow(ligne)
+    # 3. Écriture des données
+    for m in mesures_queryset:
+        date_excel = m.timestamp.strftime('%d/%m/%Y %H:%M:%S') if m.timestamp else ''
+        writer.writerow([
+            m.id_capteur.id_capteur,
+            m.id_capteur.nom,
+            m.temperature,
+            date_excel
+        ])
 
     return response
+
+
+# --- NOUVELLES FONCTIONS CRUD ---
+
+def supprimer_donnee(request, donnee_id):
+    """Supprime un relevé de température spécifique et redirige vers la salle"""
+    donnee = get_object_or_404(Donnees, id_donnee=donnee_id)
+    salle_nom = donnee.id_capteur.emplacement
+    donnee.delete()
+    return redirect('salle_detail', salle_nom=salle_nom)
+
+
+def modifier_capteur(request, capteur_id):
+    """Gère la modification du nom et de la pièce d'un capteur"""
+    capteur = get_object_or_404(Capteurs, id_capteur=capteur_id)
+
+    if request.method == 'POST':
+        capteur.nom = request.POST.get('nom_capteur')
+        capteur.emplacement = request.POST.get('emplacement_capteur')
+        capteur.save()
+        # Redirige vers la nouvelle pièce assignée au capteur
+        return redirect('salle_detail', salle_nom=capteur.emplacement)
+
+    return render(request, 'capteurs/modifier_capteur.html', {'capteur': capteur})

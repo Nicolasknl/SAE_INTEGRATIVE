@@ -5,16 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Supervision SAE</title>
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lexend:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
     <link rel="stylesheet" href="{% static 'capteurs/css/style.css' %}">
 </head>
-<body> <div class="container dashboard-container">
-
+<body>
+    <div class="container dashboard-container">
         <div class="d-flex justify-content-between align-items-center mb-5">
             <div>
                 <h1 class="fw-bold mb-1">Système de Supervision</h1>
@@ -28,33 +25,28 @@
         </div>
 
         <div class="row g-4 mb-5">
-
+            {% for salle in salles %}
             <div class="col-md-6">
-                <a href="{% url 'salle_detail' salle_id=1 %}" class="gauge-card text-center" style="--accent-color: var(--salle1-color); --percentage: 65;">
-                    <h3 class="mb-4">Séjour</h3>
+                <a href="{% url 'salle_detail' salle.nom %}" class="gauge-card text-center"
+                   style="--accent-color: var(--salle{% if forloop.counter|divisibleby:2 %}2{% else %}1{% endif %}-color); --percentage: 65;">
+                    <h3 class="mb-4">{{ salle.nom }}</h3>
                     <div class="gauge-outer">
                         <div class="gauge-inner">
-                            <div class="gauge-value" style="color: var(--salle1-color);">{{ moyenne_salle1|default:"24.2" }}</div>
+                            <div class="gauge-value" style="color: var(--salle{% if forloop.counter|divisibleby:2 %}2{% else %}1{% endif %}-color);">
+                                {{ salle.moyenne }}
+                            </div>
                             <div class="gauge-unit">Degrés C</div>
                         </div>
                     </div>
                     <p class="mt-4 text-secondary small">Cliquez pour voir l'historique complet</p>
                 </a>
             </div>
-
-            <div class="col-md-6">
-                <a href="{% url 'salle_detail' salle_id=2 %}" class="gauge-card text-center" style="--accent-color: var(--salle2-color); --percentage: 45;">
-                    <h3 class="mb-4">Chambre 1</h3>
-                    <div class="gauge-outer">
-                        <div class="gauge-inner">
-                            <div class="gauge-value" style="color: var(--salle2-color);">{{ moyenne_salle2|default:"19.5" }}</div>
-                            <div class="gauge-unit">Degrés C</div>
-                        </div>
-                    </div>
-                    <p class="mt-4 text-secondary small">Cliquez pour voir l'historique complet</p>
-                </a>
+            {% empty %}
+            <div class="col-12 text-center text-secondary py-5">
+                <i class="fa-solid fa-temperature-empty fs-1 mb-3"></i>
+                <p>Aucune donnée de capteur trouvée dans la base.</p>
             </div>
-
+            {% endfor %}
         </div>
 
         <div class="history-card shadow-lg">
@@ -78,8 +70,8 @@
                             <td class="text-secondary">{{ msg.heure }}</td>
                             <td><code class="text-info">{{ msg.id }}</code></td>
                             <td>
-                                <span class="badge-salle {% if msg.salle == '1' or msg.salle|lower == 'salle 1' %}bg-primary{% else %}bg-success{% endif %} bg-opacity-25 {% if msg.salle == '1' or msg.salle|lower == 'salle 1' %}text-primary{% else %}text-success{% endif %}">
-                                    {% if msg.salle == '1' or msg.salle|lower == 'salle 1' %}SALLE 1{% else %}SALLE 2{% endif %}
+                                <span class="badge-salle {% if forloop.counter|divisibleby:2 %}bg-success text-success{% else %}bg-primary text-primary{% endif %} bg-opacity-25">
+                                    {{ msg.salle }}
                                 </span>
                             </td>
                             <td class="fw-bold fs-5">{{ msg.temp }} °C</td>
@@ -87,9 +79,6 @@
                         {% empty %}
                         <tr><td class="text-secondary">15:32:01</td><td><code>12A6B8</code></td><td><span class="badge-salle bg-primary bg-opacity-25 text-primary">Séjour</span></td><td class="fw-bold fs-5">24.5 °C</td></tr>
                         <tr><td class="text-secondary">15:31:56</td><td><code>89F2C1</code></td><td><span class="badge-salle bg-success bg-opacity-25 text-success">Chambre 1</span></td><td class="fw-bold fs-5">19.2 °C</td></tr>
-                        <tr><td class="text-secondary">15:31:51</td><td><code>12A6B8</code></td><td><span class="badge-salle bg-primary bg-opacity-25 text-primary">Séjour</span></td><td class="fw-bold fs-5">24.1 °C</td></tr>
-                        <tr><td class="text-secondary">15:31:46</td><td><code>89F2C1</code></td><td><span class="badge-salle bg-success bg-opacity-25 text-success">Chambre 1</span></td><td class="fw-bold fs-5">19.4 °C</td></tr>
-                        <tr><td class="text-secondary">15:31:41</td><td><code>12A6B8</code></td><td><span class="badge-salle bg-primary bg-opacity-25 text-primary">Séjour</span></td><td class="fw-bold fs-5">23.9 °C</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -98,16 +87,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
         function runLiveClock() {
             const clockElement = document.getElementById('live-clock');
             const now = new Date();
-
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
-
             clockElement.textContent = `${hours}:${minutes}:${seconds}`;
         }
         runLiveClock();
