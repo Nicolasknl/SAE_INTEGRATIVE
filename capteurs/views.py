@@ -8,6 +8,7 @@ from datetime import timedelta
 
 
 def index(request):
+
     stats_salles = Donnees.objects.values('id_capteur__emplacement').annotate(
         moyenne_temp=Avg('temperature')
     ).order_by('id_capteur__emplacement')
@@ -42,7 +43,7 @@ def index(request):
 
 
 def salle_detail(request, salle_nom):
-    # 1. Récupération des filtres de l'URL
+
     search_query = request.GET.get('search', '').strip()
     date_debut = request.GET.get('date_debut', '')
     date_fin = request.GET.get('date_fin', '')

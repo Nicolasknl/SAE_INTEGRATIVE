@@ -5,10 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Détails {{ salle_nom }}</title>
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lexend:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <link rel="stylesheet" href="{% static 'capteurs/css/style.css' %}">
 </head>
 <body>
@@ -19,17 +20,6 @@
             <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-sm px-3 rounded-pill text-white">
                 <i class="fa-solid fa-arrow-left me-2"></i> Retour au Dashboard
             </a>
-            <div class="text-end">
-                <div class="d-flex align-items-center gap-2">
-                    <small class="text-secondary text-nowrap"><i class="fa-solid fa-sync fa-spin text-warning me-1"></i> Auto-refresh :</small>
-                    <select class="form-select form-select-sm py-0" style="width: auto; height: 28px;">
-                        <option value="5">5s</option>
-                        <option value="10">10s</option>
-                        <option value="30">30s</option>
-                        <option value="0">Désactivé</option>
-                    </select>
-                </div>
-            </div>
         </div>
 
         <div class="mb-4">
@@ -67,11 +57,11 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label text-secondary small fw-bold">Depuis le</label>
-                    <input type="datetime-local" name="date_debut" class="form-control" value="{{ request.GET.date_debut }}" onclick="this.showPicker()">
+                    <input type="text" name="date_debut" class="form-control datetimepicker" placeholder="Sélectionner date et heure..." value="{{ request.GET.date_debut }}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label text-secondary small fw-bold">Jusqu'au</label>
-                    <input type="datetime-local" name="date_fin" class="form-control" value="{{ request.GET.date_fin }}" onclick="this.showPicker()">
+                    <input type="text" name="date_fin" class="form-control datetimepicker" placeholder="Sélectionner date et heure..." value="{{ request.GET.date_fin }}">
                 </div>
                 <div class="col-md-3 d-flex gap-2">
                     <button type="submit" class="btn btn-primary w-100 fw-bold">Filtrer</button>
@@ -134,52 +124,56 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            const ctx = document.getElementById('tempChart').getContext('2d');
+            flatpickr(".datetimepicker", {
+                enableTime: true,
+                dateFormat: "Y-m-d H:i",
+                time_24hr: true,
+                locale: "fr",
+                allowInput: true
+            });
 
-            // Récupération des tableaux injectés par Python
+            const ctx = document.getElementById('tempChart').getContext('2d');
             const labelsGraph = {{ graph_dates|safe }};
             const dataGraph = {{ graph_temps|safe }};
 
-            if (labelsGraph.length === 0) {
-                console.log("Aucune donnée disponible pour le graphique.");
-                return;
-            }
-
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labelsGraph,
-                    datasets: [{
-                        label: 'Température (°C)',
-                        data: dataGraph,
-                        borderColor: '#0dcaf0',
-                        backgroundColor: 'rgba(13, 202, 240, 0.05)',
-                        borderWidth: 2,
-                        tension: 0.2,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#a0a0a0', maxTicksLimit: 12 }
-                        },
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#a0a0a0' }
-                        }
+            if (labelsGraph.length > 0) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labelsGraph,
+                        datasets: [{
+                            label: 'Température (°C)',
+                            data: dataGraph,
+                            borderColor: '#0dcaf0',
+                            backgroundColor: 'rgba(13, 202, 240, 0.05)',
+                            borderWidth: 2,
+                            tension: 0.2,
+                            fill: true
+                        }]
                     },
-                    plugins: {
-                        legend: { display: false }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                ticks: { color: '#a0a0a0', maxTicksLimit: 12 }
+                            },
+                            y: {
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                ticks: { color: '#a0a0a0' }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
                     }
-                }
-            });
+                });
+            }
         });
     </script>
 </body>
