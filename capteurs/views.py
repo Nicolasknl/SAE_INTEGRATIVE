@@ -8,7 +8,6 @@ from datetime import timedelta
 
 
 def index(request):
-
     stats_salles = Donnees.objects.values('id_capteur__emplacement').annotate(
         moyenne_temp=Avg('temperature')
     ).order_by('id_capteur__emplacement')
@@ -43,7 +42,6 @@ def index(request):
 
 
 def salle_detail(request, salle_nom):
-
     search_query = request.GET.get('search', '').strip()
     date_debut = request.GET.get('date_debut', '')
     date_fin = request.GET.get('date_fin', '')
@@ -69,14 +67,16 @@ def salle_detail(request, salle_nom):
     moyenne_recuperee = mesures_queryset.aggregate(Avg('temperature'))['temperature__avg']
     moyenne_calculee = round(moyenne_recuperee, 1) if moyenne_recuperee is not None else "--.-"
 
-    # 5. PRÉPARATION DES DONNÉES DU GRAPHIQUE (Limité aux 3 dernières heures par défaut)
+    # 5. PRÉPARATION DES DONNÉES DU GRAPHIQUE (Limité aux 30 dernières minutes ET max 40 points)
     if not date_debut and not date_fin:
-        # Si aucun filtre de date n'est mis, on prend NOW - 3 heures
-        il_y_a_3_heures = timezone.now() - timedelta(hours=2)
-        mesures_chrono = mesures_queryset.filter(timestamp__gte=il_y_a_3_heures).order_by('timestamp')
+        il_y_a_30_minutes = timezone.now() - timedelta(minutes=30)
+        # On récupère les données des 30 dernières minutes, triées du plus récent au plus ancien
+        mesures_chrono = mesures_queryset.filter(timestamp__gte=il_y_a_30_minutes).order_by('-timestamp')[:40]
+        # On force la conversion en liste et on remet dans le bon sens (chronologique) pour le graphique
+        mesures_chrono = list(reversed(mesures_chrono))
     else:
-        # Si l'utilisateur a mis un filtre, le graphique s'adapte à sa demande
-        mesures_chrono = mesures_queryset.order_by('timestamp')
+        # Si l'utilisateur filtre, on garde l'ordre chronologique classique en format liste
+        mesures_chrono = list(mesures_queryset.order_by('timestamp'))
 
     # ASTUCE : On affiche juste '%H:%M' au lieu de la date complète pour alléger l'axe X
     graph_dates = [m.timestamp.strftime('%H:%M') for m in mesures_chrono]
@@ -101,7 +101,7 @@ def salle_detail(request, salle_nom):
         'graph_dates': graph_dates,
         'graph_temps': graph_temps,
     }
-    
+
     return render(request, 'capteurs/salle.html', context)
 
 
@@ -144,10 +144,8 @@ def export_salle_csv(request, salle_nom):
     return response
 
 
-# --- NOUVELLES FONCTIONS CRUD ---
 
 def supprimer_donnee(request, donnee_id):
-    """Supprime un relevé de température spécifique et redirige vers la salle"""
     donnee = get_object_or_404(Donnees, id_donnee=donnee_id)
     salle_nom = donnee.id_capteur.emplacement
     donnee.delete()
@@ -155,14 +153,12 @@ def supprimer_donnee(request, donnee_id):
 
 
 def modifier_capteur(request, capteur_id):
-    """Gère la modification du nom et de la pièce d'un capteur"""
     capteur = get_object_or_404(Capteurs, id_capteur=capteur_id)
 
     if request.method == 'POST':
         capteur.nom = request.POST.get('nom_capteur')
         capteur.emplacement = request.POST.get('emplacement_capteur')
         capteur.save()
-        # Redirige vers la nouvelle pièce assignée au capteur
         return redirect('salle_detail', salle_nom=capteur.emplacement)
 
     return render(request, 'capteurs/modifier_capteur.html', {'capteur': capteur})

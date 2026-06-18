@@ -140,40 +140,43 @@
             const labelsGraph = {{ graph_dates|safe }};
             const dataGraph = {{ graph_temps|safe }};
 
-            if (labelsGraph.length > 0) {
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labelsGraph,
-                        datasets: [{
-                            label: 'Température (°C)',
-                            data: dataGraph,
-                            borderColor: '#0dcaf0',
-                            backgroundColor: 'rgba(13, 202, 240, 0.05)',
-                            borderWidth: 2,
-                            tension: 0.2,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                                ticks: { color: '#a0a0a0', maxTicksLimit: 12 }
-                            },
-                            y: {
-                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                                ticks: { color: '#a0a0a0' }
-                            }
-                        },
-                        plugins: {
-                            legend: { display: false }
-                        }
-                    }
-                });
+if (labelsGraph.length > 0) {
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labelsGraph,
+            datasets: [{
+                label: 'Température (°C)',
+                data: dataGraph,
+                borderColor: '#0dcaf0',
+                backgroundColor: 'rgba(13, 202, 240, 0.05)',
+                borderWidth: 1.5,     // Ligne légèrement affinée pour réduire l'effet de masse
+                tension: 0.1,         // Courbure adoucie pour un tracé plus fluide
+                fill: true,
+                pointRadius: 0,       // Cache les milliers de petits ronds bleus qui saturent l'écran
+                hitRadius: 10,        // Augmente la zone de détection pour que le survol reste facile
+                hoverRadius: 4        // Le point bleu réapparaît proprement uniquement au survol de la souris
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#a0a0a0', maxTicksLimit: 12 }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#a0a0a0' }
+                }
+            },
+            plugins: {
+                legend: { display: false }
             }
+        }
+    });
+}
             setInterval(() => window.location.reload(), 30000);
         });
     </script>
