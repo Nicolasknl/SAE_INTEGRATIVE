@@ -28,14 +28,18 @@
             {% for salle in salles %}
             <div class="col-md-6">
                 <a href="{% url 'salle_detail' salle.nom %}" class="gauge-card text-center"
-                   style="--accent-color: var(--salle{% if forloop.counter|divisibleby:2 %}2{% else %}1{% endif %}-color); --percentage: 65;">
+                   style="--accent-color: var(--salle{% if forloop.counter|divisibleby:2 %}2{% else %}1{% endif %}-color); --percentage: {% if salle.moyenne == '--.-' %}0{% else %}65{% endif %};">
                     <h3 class="mb-4">{{ salle.nom }}</h3>
                     <div class="gauge-outer">
                         <div class="gauge-inner">
                             <div class="gauge-value" style="color: var(--salle{% if forloop.counter|divisibleby:2 %}2{% else %}1{% endif %}-color);">
-                                {{ salle.moyenne }}
+                                {% if salle.moyenne == '--.-' %}
+                                    <span class="text-secondary opacity-50">--.-</span>
+                                {% else %}
+                                    {{ salle.moyenne }}
+                                {% endif %}
                             </div>
-                            <div class="gauge-unit">Degrés C</div>
+                            <div class="gauge-unit">{% if salle.moyenne == '--.-' %}Pas de données{% else %}Degrés C{% endif %}</div>
                         </div>
                     </div>
                     <p class="mt-4 text-secondary small">Cliquez pour voir l'historique complet</p>
@@ -43,8 +47,8 @@
             </div>
             {% empty %}
             <div class="col-12 text-center text-secondary py-5">
-                <i class="fa-solid fa-temperature-empty fs-1 mb-3"></i>
-                <p>Aucune donnée de capteur trouvée dans la base.</p>
+                <i class="fa-solid fa-microchip fs-1 mb-3"></i>
+                <p>Aucun capteur ou pièce enregistré dans la base de données.</p>
             </div>
             {% endfor %}
         </div>
@@ -77,6 +81,11 @@
                             <td class="fw-bold fs-5">{{ msg.temp }} °C</td>
                         </tr>
                         {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-3 text-secondary small">
+                                En attente de la réception de nouvelles trames de données...
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>

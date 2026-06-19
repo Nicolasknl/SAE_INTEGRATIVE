@@ -8,17 +8,22 @@ from datetime import timedelta
 
 
 def index(request):
-    stats_salles = Donnees.objects.values('id_capteur__emplacement').annotate(
-        moyenne_temp=Avg('temperature')
-    ).order_by('id_capteur__emplacement')
+    # 1. Récupération de TOUTES les pièces uniques à partir de la table Capteurs
+    # Ainsi, même si les données brutes sont supprimées, la pièce reste affichée
+    salles_existantes = Capteurs.objects.values_list('emplacement', flat=True).distinct().order_by('emplacement')
 
     salles_data = []
-    for s in stats_salles:
-        nom_piece = s['id_capteur__emplacement']
-        if nom_piece:
+    for nom_piece in salles_existantes:
+        if nom_piece:  # On s'assure que le nom de la pièce n'est pas vide
+            # On calcule la moyenne des températures uniquement pour cette pièce
+            moyenne_brute = Donnees.objects.filter(id_capteur__emplacement=nom_piece).aggregate(
+                avg_temp=Avg('temperature')
+            )['avg_temp']
+
             salles_data.append({
                 'nom': nom_piece,
-                'moyenne': round(s['moyenne_temp'], 1) if s['moyenne_temp'] is not None else "--.-"
+                # Si moyenne_brute est None (pas de données), on affiche "--.-"
+                'moyenne': round(moyenne_brute, 1) if moyenne_brute is not None else "--.-"
             })
 
     # 2. Récupération des 5 derniers relevés globaux de la BDD
@@ -162,3 +167,12 @@ def modifier_capteur(request, capteur_id):
         return redirect('salle_detail', salle_nom=capteur.emplacement)
 
     return render(request, 'capteurs/modifier_capteur.html', {'capteur': capteur})
+
+
+def supprimer_toutes_donnees(request, salle_nom):
+    if request.method == 'POST':
+        # On cible uniquement les données liées à la salle actuelle et on vide tout d'un coup
+        Donnees.objects.filter(id_capteur__emplacement=salle_nom).delete()
+
+    # Une fois vidé, on recharge la page de la salle
+    return redirect('salle_detail', salle_nom=salle_nom)

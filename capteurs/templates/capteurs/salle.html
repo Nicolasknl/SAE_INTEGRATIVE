@@ -80,9 +80,18 @@
         </div>
 
         <div class="history-card shadow-lg">
-            <div class="p-4 border-bottom border-secondary border-opacity-25">
+            <div class="p-4 border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0 fw-bold"><i class="fa-solid fa-database text-info me-2"></i> Données brutes de la pièce</h5>
+
+                <form action="{% url 'supprimer_toutes_donnees' salle_nom %}" method="POST"
+                      onsubmit="return confirm('🚨 ATTENTION : Êtes-vous sûr de vouloir supprimer TOUTES les données brutes de la salle {{ salle_nom }} ? Cette action est définitive.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm fw-bold">
+                        <i class="fa-solid fa-trash-can me-2"></i> Vider le tableau
+                    </button>
+                </form>
             </div>
+
             <div class="table-responsive">
                 <table class="table table-dark table-hover mb-0">
                     <thead>
@@ -140,43 +149,43 @@
             const labelsGraph = {{ graph_dates|safe }};
             const dataGraph = {{ graph_temps|safe }};
 
-if (labelsGraph.length > 0) {
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labelsGraph,
-            datasets: [{
-                label: 'Température (°C)',
-                data: dataGraph,
-                borderColor: '#0dcaf0',
-                backgroundColor: 'rgba(13, 202, 240, 0.05)',
-                borderWidth: 1.5,     // Ligne légèrement affinée pour réduire l'effet de masse
-                tension: 0.1,         // Courbure adoucie pour un tracé plus fluide
-                fill: true,
-                pointRadius: 0,       // Cache les milliers de petits ronds bleus qui saturent l'écran
-                hitRadius: 10,        // Augmente la zone de détection pour que le survol reste facile
-                hoverRadius: 4        // Le point bleu réapparaît proprement uniquement au survol de la souris
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#a0a0a0', maxTicksLimit: 12 }
-                },
-                y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#a0a0a0' }
-                }
-            },
-            plugins: {
-                legend: { display: false }
+            if (labelsGraph.length > 0) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labelsGraph,
+                        datasets: [{
+                            label: 'Température (°C)',
+                            data: dataGraph,
+                            borderColor: '#0dcaf0',
+                            backgroundColor: 'rgba(13, 202, 240, 0.05)',
+                            borderWidth: 1.5,
+                            tension: 0.1,
+                            fill: true,
+                            pointRadius: 0,
+                            hitRadius: 10,
+                            hoverRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                ticks: { color: '#a0a0a0', maxTicksLimit: 12 }
+                            },
+                            y: {
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                ticks: { color: '#a0a0a0' }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
             }
-        }
-    });
-}
             setInterval(() => window.location.reload(), 30000);
         });
     </script>
