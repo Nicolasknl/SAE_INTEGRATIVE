@@ -63,7 +63,7 @@
                     <thead>
                         <tr>
                             <th>Heure</th>
-                            <th>Capteur ID</th>
+                            <th>Nom du Capteur</th>
                             <th>Salle</th>
                             <th>Valeur</th>
                         </tr>
@@ -72,7 +72,7 @@
                         {% for msg in derniers_messages %}
                         <tr>
                             <td class="text-secondary">{{ msg.heure }}</td>
-                            <td><code class="text-info">{{ msg.id }}</code></td>
+                            <td><code class="text-info">{{ msg.nom }}</code></td>
                             <td>
                                 <span class="badge-salle {% if forloop.counter|divisibleby:2 %}bg-success text-success{% else %}bg-primary text-primary{% endif %} bg-opacity-25">
                                     {{ msg.salle }}

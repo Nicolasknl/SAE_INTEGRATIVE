@@ -8,37 +8,31 @@ from datetime import timedelta
 
 
 def index(request):
-    # 1. Récupération de TOUTES les pièces uniques à partir de la table Capteurs
-    # Ainsi, même si les données brutes sont supprimées, la pièce reste affichée
     salles_existantes = Capteurs.objects.values_list('emplacement', flat=True).distinct().order_by('emplacement')
 
     salles_data = []
     for nom_piece in salles_existantes:
-        if nom_piece:  # On s'assure que le nom de la pièce n'est pas vide
-            # On calcule la moyenne des températures uniquement pour cette pièce
+        if nom_piece:
             moyenne_brute = Donnees.objects.filter(id_capteur__emplacement=nom_piece).aggregate(
                 avg_temp=Avg('temperature')
             )['avg_temp']
 
             salles_data.append({
                 'nom': nom_piece,
-                # Si moyenne_brute est None (pas de données), on affiche "--.-"
                 'moyenne': round(moyenne_brute, 1) if moyenne_brute is not None else "--.-"
             })
 
-    # 2. Récupération des 5 derniers relevés globaux de la BDD
     derniers_releves = Donnees.objects.select_related('id_capteur').order_by('-timestamp')[:5]
 
     derniers_messages = []
     for r in derniers_releves:
         derniers_messages.append({
             'heure': r.timestamp.strftime('%H:%M:%S') if r.timestamp else '--:--:--',
-            'id': r.id_capteur.id_capteur,
+            'nom': r.id_capteur.nom,
             'salle': r.id_capteur.emplacement if r.id_capteur.emplacement else "Sans salle",
             'temp': r.temperature
         })
 
-    # 3. Envoi au template index.html
     context = {
         'salles': salles_data,
         'derniers_messages': derniers_messages
@@ -51,11 +45,9 @@ def salle_detail(request, salle_nom):
     date_debut = request.GET.get('date_debut', '')
     date_fin = request.GET.get('date_fin', '')
 
-    # 2. Requête de base pour la salle courante
     mesures_queryset = Donnees.objects.filter(id_capteur__emplacement=salle_nom).select_related('id_capteur').order_by(
         '-timestamp')
 
-    # 3. Filtres ORM cumulables
     if search_query:
         mesures_queryset = mesures_queryset.filter(
             Q(id_capteur__id_capteur__icontains=search_query) |
@@ -68,50 +60,43 @@ def salle_detail(request, salle_nom):
     if date_fin:
         mesures_queryset = mesures_queryset.filter(timestamp__lte=date_fin)
 
-    # 4. Calcul de la moyenne dynamique sur les données filtrées
     moyenne_recuperee = mesures_queryset.aggregate(Avg('temperature'))['temperature__avg']
     moyenne_calculee = round(moyenne_recuperee, 1) if moyenne_recuperee is not None else "--.-"
 
-    # 5. PRÉPARATION DES DONNÉES DU GRAPHIQUE (Limité aux 30 dernières minutes ET max 40 points)
     if not date_debut and not date_fin:
         il_y_a_30_minutes = timezone.now() - timedelta(minutes=30)
-        # On récupère les données des 30 dernières minutes, triées du plus récent au plus ancien
         mesures_chrono = mesures_queryset.filter(timestamp__gte=il_y_a_30_minutes).order_by('-timestamp')[:40]
-        # On force la conversion en liste et on remet dans le bon sens (chronologique) pour le graphique
         mesures_chrono = list(reversed(mesures_chrono))
     else:
-        # Si l'utilisateur filtre, on garde l'ordre chronologique classique en format liste
         mesures_chrono = list(mesures_queryset.order_by('timestamp'))
 
-    # ASTUCE : On affiche juste '%H:%M' au lieu de la date complète pour alléger l'axe X
     graph_dates = [m.timestamp.strftime('%H:%M') for m in mesures_chrono]
     graph_temps = [float(m.temperature) for m in mesures_chrono]
 
-    # 6. Adaptation du format pour le tableau HTML
     mesures_filtrees = []
     for m in mesures_queryset:
         mesures_filtrees.append({
-            'id_brut': m.id_donnee,  # Clé primaire nécessaire pour la suppression
+            'id_brut': m.id_donnee,
             'id': m.id_capteur.id_capteur,
             'nom': m.id_capteur.nom,
             'valeur': m.temperature,
             'date_iso': m.timestamp.strftime('%Y-%m-%dT%H:%M') if m.timestamp else '',
             'date': m.timestamp.strftime('%d/%m/%Y %H:%M') if m.timestamp else ''
         })
-
+    capteurs_de_la_salle = Capteurs.objects.filter(emplacement=salle_nom)
     context = {
         'salle_nom': salle_nom,
         'mesures': mesures_filtrees,
         'moyenne_salle': moyenne_calculee,
         'graph_dates': graph_dates,
         'graph_temps': graph_temps,
+        'liste_capteurs_salle': capteurs_de_la_salle,
     }
 
     return render(request, 'capteurs/salle.html', context)
 
 
 def export_salle_csv(request, salle_nom):
-    # 1. Récupération des filtres pour l'export
     search_query = request.GET.get('search', '').strip()
     date_debut = request.GET.get('date_debut', '')
     date_fin = request.GET.get('date_fin', '')
@@ -129,14 +114,12 @@ def export_salle_csv(request, salle_nom):
     if date_fin:
         mesures_queryset = mesures_queryset.filter(timestamp__lte=date_fin)
 
-    # 2. Préparation du fichier CSV
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="export_{salle_nom}.csv"'
 
     writer = csv.writer(response, delimiter=';')
     writer.writerow(['ID Capteur', 'Nom du Capteur', 'Valeur Enregistree (C)', 'Date et Heure'])
 
-    # 3. Écriture des données
     for m in mesures_queryset:
         date_excel = m.timestamp.strftime('%d/%m/%Y %H:%M:%S') if m.timestamp else ''
         writer.writerow([
@@ -147,7 +130,6 @@ def export_salle_csv(request, salle_nom):
         ])
 
     return response
-
 
 
 def supprimer_donnee(request, donnee_id):
@@ -171,8 +153,22 @@ def modifier_capteur(request, capteur_id):
 
 def supprimer_toutes_donnees(request, salle_nom):
     if request.method == 'POST':
-        # On cible uniquement les données liées à la salle actuelle et on vide tout d'un coup
-        Donnees.objects.filter(id_capteur__emplacement=salle_nom).delete()
+        search_query = request.POST.get('search', '').strip()
+        date_debut = request.POST.get('date_debut', '')
+        date_fin = request.POST.get('date_fin', '')
 
-    # Une fois vidé, on recharge la page de la salle
+        mesures_a_supprimer = Donnees.objects.filter(id_capteur__emplacement=salle_nom)
+
+        if search_query:
+            mesures_a_supprimer = mesures_a_supprimer.filter(
+                Q(id_capteur__id_capteur__icontains=search_query) |
+                Q(id_capteur__nom__icontains=search_query)
+            )
+        if date_debut:
+            mesures_a_supprimer = mesures_a_supprimer.filter(timestamp__gte=date_debut)
+        if date_fin:
+            mesures_a_supprimer = mesures_a_supprimer.filter(timestamp__lte=date_fin)
+
+        mesures_a_supprimer.delete()
+
     return redirect('salle_detail', salle_nom=salle_nom)

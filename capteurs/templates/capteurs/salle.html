@@ -31,7 +31,7 @@
         </div>
 
         <div class="row g-3 mb-4">
-            <div class="col-md-6 col-lg-4">
+            <div class="col-md-4">
                 <div class="p-3 stat-box d-flex align-items-center justify-content-between" style="border-left-color: var(--salle1-color);">
                     <div>
                         <small class="text-secondary text-uppercase tracking-wider">Moyenne Globale (Filtrée)</small>
@@ -41,10 +41,16 @@
                 </div>
             </div>
 
-            <div class="col-md-6 col-lg-4 d-flex align-items-center">
+            <div class="col-md-4 d-flex align-items-center">
                 <a href="{% url 'export_salle_csv' salle_nom=salle_nom %}?search={{ request.GET.search }}&date_debut={{ request.GET.date_debut }}&date_fin={{ request.GET.date_fin }}" class="btn btn-outline-success w-100 py-3 rounded-3 fw-bold">
-                    <i class="fa-solid fa-file-csv me-2"></i> Exporter les données (.CSV)
+                    <i class="fa-solid fa-file-csv me-2"></i> Exporter en CSV
                 </a>
+            </div>
+
+            <div class="col-md-4 d-flex align-items-center">
+                <button type="button" class="btn btn-outline-warning w-100 py-3 rounded-3 fw-bold" data-bs-toggle="modal" data-bs-target="#gestionCapteursModal">
+                    <i class="fa-solid fa-microchip me-2"></i> Gérer les capteurs
+                </button>
             </div>
         </div>
 
@@ -52,8 +58,8 @@
             <h5 class="text-white mb-3 fw-bold"><i class="fa-solid fa-filter text-warning me-2"></i> Filtres cumulables</h5>
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label text-secondary small fw-bold">Nom ou ID du Capteur</label>
-                    <input type="text" name="search" class="form-control" placeholder="Ex: 12345" value="{{ request.GET.search }}">
+                    <label class="form-label text-secondary small fw-bold">Nom du Capteur</label>
+                    <input type="text" name="search" class="form-control" placeholder="Ex: DHT22-Mural" value="{{ request.GET.search }}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label text-secondary small fw-bold">Depuis le</label>
@@ -84,10 +90,20 @@
                 <h5 class="mb-0 fw-bold"><i class="fa-solid fa-database text-info me-2"></i> Données brutes de la pièce</h5>
 
                 <form action="{% url 'supprimer_toutes_donnees' salle_nom %}" method="POST"
-                      onsubmit="return confirm('🚨 ATTENTION : Êtes-vous sûr de vouloir supprimer TOUTES les données brutes de la salle {{ salle_nom }} ? Cette action est définitive.');">
+                      onsubmit="return confirm('🚨 ATTENTION : Êtes-vous sûr de vouloir supprimer les données affichées ? Cette action est définitive.');">
                     {% csrf_token %}
+
+                    <input type="hidden" name="search" value="{{ request.GET.search }}">
+                    <input type="hidden" name="date_debut" value="{{ request.GET.date_debut }}">
+                    <input type="hidden" name="date_fin" value="{{ request.GET.date_fin }}">
+
                     <button type="submit" class="btn btn-danger btn-sm fw-bold">
-                        <i class="fa-solid fa-trash-can me-2"></i> Vider le tableau
+                        <i class="fa-solid fa-trash-can me-2"></i>
+                        {% if request.GET.search or request.GET.date_debut or request.GET.date_fin %}
+                            Supprimer la sélection filtrée
+                        {% else %}
+                            Vider tout le tableau
+                        {% endif %}
                     </button>
                 </form>
             </div>
@@ -96,30 +112,27 @@
                 <table class="table table-dark table-hover mb-0">
                     <thead>
                         <tr>
-                            <th>ID Capteur</th>
                             <th>Nom du Capteur</th>
                             <th>Valeur Enregistrée</th>
                             <th>Date / Heure de Réception</th>
-                            <th class="text-center">Configuration</th>
+                            <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for mesure in mesures %}
                         <tr>
-                            <td><code class="text-info">#{{ mesure.id }}</code></td>
                             <td>{{ mesure.nom }}</td>
                             <td class="fw-bold fs-5 text-white">{{ mesure.valeur }} °C</td>
                             <td class="text-secondary">{{ mesure.date }}</td>
                             <td class="text-center">
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'modifier_capteur' capteur_id=mesure.id %}" class="btn btn-outline-warning"><i class="fa-solid fa-pen"></i></a>
-                                    <a href="{% url 'supprimer_donnee' donnee_id=mesure.id_brut %}" class="btn btn-outline-danger" onclick="return confirm('Supprimer définitivement cette mesure ?');"><i class="fa-solid fa-trash"></i></a>
-                                </div>
+                                <a href="{% url 'supprimer_donnee' donnee_id=mesure.id_brut %}" class="btn btn-sm btn-outline-danger" title="Supprimer ce relevé" onclick="return confirm('Supprimer définitivement cette mesure ?');">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center py-4 text-secondary">
+                            <td colspan="4" class="text-center py-4 text-secondary">
                                 <i class="fa-solid fa-folder-open fs-3 mb-2"></i>
                                 <p class="mb-0">Aucune donnée disponible.</p>
                             </td>
@@ -127,6 +140,36 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="gestionCapteursModal" tabindex="-1" aria-labelledby="gestionCapteursModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border-secondary">
+                <div class="modal-header border-bottom border-secondary border-opacity-25">
+                    <h5 class="modal-title fw-bold" id="gestionCapteursModalLabel">
+                        <i class="fa-solid fa-microchip text-warning me-2"></i>Capteurs de la {{ salle_nom }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-secondary small mb-3">Sélectionnez un capteur pour modifier son nom ou son emplacement.</p>
+                    <ul class="list-group list-group-flush">
+                        {% for capteur in liste_capteurs_salle %}
+                        <li class="list-group-item bg-transparent text-white border-secondary border-opacity-25 d-flex justify-content-between align-items-center px-0 py-3">
+                            <span class="fw-bold">{{ capteur.nom }}</span>
+                            <a href="{% url 'modifier_capteur' capteur_id=capteur.id_capteur %}" class="btn btn-sm btn-outline-warning">
+                                <i class="fa-solid fa-pen me-1"></i> Configurer
+                            </a>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item bg-transparent text-secondary border-0 px-0">
+                            Aucun capteur physique enregistré pour cette pièce.
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -188,6 +231,6 @@
             }
             setInterval(() => window.location.reload(), 30000);
         });
-    </script>
+    </script> 
 </body>
 </html>
